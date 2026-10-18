@@ -70,7 +70,7 @@ func (r RoomState) String() string {
 	}
 }
 
-// Errores comunes de validación y de dominio (manejo idiomático de errores).
+// Errores de dominio para control defensivo sin pánico.
 var (
 	ErrEmptyID          = errors.New("el identificador no puede estar vacío")
 	ErrEmptyName        = errors.New("el nombre no puede estar vacío")

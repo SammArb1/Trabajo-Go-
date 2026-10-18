@@ -1,69 +1,33 @@
 package hospital
 
-// Person representa la entidad base con atributos y métodos compartidos
-// para las personas en el hospital (encapsulamiento con campos privados).
+// Person representa la entidad base con atributos compartidos para las personas en el hospital.
+// Cumple con encapsulamiento estricto: campos no exportados y getters públicos.
 type Person struct {
 	id   string
 	name string
 	age  int
 }
 
-// NewPerson construye una nueva instancia de Person con validación defensiva.
-func NewPerson(id string, name string, age int) (*Person, error) {
-	if id == "" {
-		return nil, ErrEmptyID
-	}
-	if name == "" {
-		return nil, ErrEmptyName
-	}
-	if age < 0 {
-		return nil, ErrInvalidAge
-	}
-	return &Person{
+// NewPerson construye una nueva instancia inmutable de Person retornada por valor.
+func NewPerson(id, name string, age int) Person {
+	return Person{
 		id:   id,
 		name: name,
 		age:  age,
-	}, nil
+	}
 }
 
 // ID retorna el identificador único de la persona.
-func (p *Person) ID() string {
-	if p == nil {
-		return ""
-	}
+func (p Person) ID() string {
 	return p.id
 }
 
-// Name retorna el nombre completo de la persona.
-func (p *Person) Name() string {
-	if p == nil {
-		return ""
-	}
+// Name retorna el nombre de la persona.
+func (p Person) Name() string {
 	return p.name
 }
 
 // Age retorna la edad de la persona en años.
-func (p *Person) Age() int {
-	if p == nil {
-		return 0
-	}
+func (p Person) Age() int {
 	return p.age
-}
-
-// SetName actualiza el nombre de la persona validando que no sea vacío.
-func (p *Person) SetName(name string) error {
-	if name == "" {
-		return ErrEmptyName
-	}
-	p.name = name
-	return nil
-}
-
-// SetAge actualiza la edad de la persona validando que sea positiva.
-func (p *Person) SetAge(age int) error {
-	if age < 0 {
-		return ErrInvalidAge
-	}
-	p.age = age
-	return nil
 }

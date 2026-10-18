@@ -18,15 +18,20 @@ var _ Attender = (*Orderly)(nil)
 
 // NewOrderly construye una nueva instancia de camillero validando sus datos.
 func NewOrderly(id, name string, age int, shift string) (*Orderly, error) {
-	person, err := NewPerson(id, name, age)
-	if err != nil {
-		return nil, err
+	if id == "" {
+		return nil, ErrEmptyID
+	}
+	if name == "" {
+		return nil, ErrEmptyName
+	}
+	if age < 0 {
+		return nil, ErrInvalidAge
 	}
 	if shift == "" {
 		shift = "Diurno"
 	}
 	return &Orderly{
-		Person: *person,
+		Person: NewPerson(id, name, age),
 		shift:  shift,
 	}, nil
 }

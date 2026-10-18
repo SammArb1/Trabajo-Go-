@@ -17,15 +17,20 @@ var _ Attender = (*Doctor)(nil)
 
 // NewDoctor crea un nuevo médico validando los datos requeridos.
 func NewDoctor(id, name string, age int, specialty string) (*Doctor, error) {
-	person, err := NewPerson(id, name, age)
-	if err != nil {
-		return nil, err
+	if id == "" {
+		return nil, ErrEmptyID
+	}
+	if name == "" {
+		return nil, ErrEmptyName
+	}
+	if age < 0 {
+		return nil, ErrInvalidAge
 	}
 	if specialty == "" {
 		specialty = "Medicina General / Somnología"
 	}
 	return &Doctor{
-		Person:    *person,
+		Person:    NewPerson(id, name, age),
 		specialty: specialty,
 	}, nil
 }

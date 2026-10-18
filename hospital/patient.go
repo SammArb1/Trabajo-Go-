@@ -1,28 +1,54 @@
 package hospital
 
+import (
+	"fmt"
+)
+
 // Patient representa a un paciente que padece narcolepsia en el hospital.
-// Embebe a Person para reutilizar la identidad y validaciones básicas.
+// Embebe a Person mediante composición y protege su estado interno con campos privados.
 type Patient struct {
 	Person
-	state    PatientState
-	level    NarcolepsyLevel
-	roomID   string
-	episodes []EpisodeRecord
+	level           NarcolepsyLevel
+	state           PatientState
+	currentLocation string
+	assignedDoctor  Attender
+	episodes        []EpisodeRecord
 }
 
-// NewPatient construye un nuevo paciente asegurando datos válidos.
-func NewPatient(id, name string, age int, level NarcolepsyLevel) (*Patient, error) {
-	person, err := NewPerson(id, name, age)
-	if err != nil {
-		return nil, err
-	}
+// NewPatient construye un nuevo paciente inicializando su estado en Awake.
+func NewPatient(id, name string, age int, level NarcolepsyLevel) *Patient {
 	return &Patient{
-		Person:   *person,
-		state:    Awake,
-		level:    level,
-		roomID:   "",
-		episodes: make([]EpisodeRecord, 0),
-	}, nil
+		Person:          NewPerson(id, name, age),
+		level:           level,
+		state:           Awake,
+		currentLocation: "",
+		assignedDoctor:  nil,
+		episodes:        make([]EpisodeRecord, 0),
+	}
+}
+
+// SufferSleepAttack simula un ataque súbito de narcolepsia, pasando el estado a
+// AsleepInHallway y guardando la ubicación física del episodio.
+func (p *Patient) SufferSleepAttack(location string) {
+	if p == nil {
+		return
+	}
+	p.state = AsleepInHallway
+	p.currentLocation = location
+}
+
+// WakeUp despierta al paciente restableciendo su estado a Awake y limpiando la ubicación.
+// Retorna error si el paciente ya se encontraba despierto.
+func (p *Patient) WakeUp() error {
+	if p == nil {
+		return fmt.Errorf("el paciente no puede ser nil")
+	}
+	if p.state == Awake {
+		return fmt.Errorf("el paciente %s ya se encuentra despierto", p.Name())
+	}
+	p.state = Awake
+	p.currentLocation = ""
+	return nil
 }
 
 // State retorna el estado actual de sueño/vigilia del paciente.
@@ -33,16 +59,7 @@ func (p *Patient) State() PatientState {
 	return p.state
 }
 
-// SetState actualiza el estado del paciente.
-func (p *Patient) SetState(s PatientState) error {
-	if p == nil {
-		return ErrNilPatient
-	}
-	p.state = s
-	return nil
-}
-
-// Level retorna la gravedad de narcolepsia diagnosticada.
+// Level retorna el nivel de severidad de narcolepsia diagnosticado.
 func (p *Patient) Level() NarcolepsyLevel {
 	if p == nil {
 		return Mild
@@ -50,33 +67,52 @@ func (p *Patient) Level() NarcolepsyLevel {
 	return p.level
 }
 
-// SetLevel modifica la gravedad de narcolepsia diagnosticada.
-func (p *Patient) SetLevel(l NarcolepsyLevel) error {
-	if p == nil {
-		return ErrNilPatient
-	}
-	p.level = l
-	return nil
-}
-
-// RoomID retorna el código de la habitación donde reposa el paciente, si aplica.
-func (p *Patient) RoomID() string {
+// Location retorna la ubicación física actual del paciente.
+func (p *Patient) Location() string {
 	if p == nil {
 		return ""
 	}
-	return p.roomID
+	return p.currentLocation
 }
 
-// SetRoomID actualiza la habitación vinculada al paciente.
-func (p *Patient) SetRoomID(roomID string) error {
+// CurrentLocation retorna la ubicación física actual del paciente (alias de Location).
+func (p *Patient) CurrentLocation() string {
+	return p.Location()
+}
+
+// SetState permite actualizar de forma controlada el estado del paciente (ej. AsleepInBed).
+func (p *Patient) SetState(s PatientState) {
 	if p == nil {
-		return ErrNilPatient
+		return
 	}
-	p.roomID = roomID
-	return nil
+	p.state = s
 }
 
-// Episodes devuelve una copia defensiva del histórico de episodios del paciente.
+// SetCurrentLocation actualiza la ubicación física actual del paciente.
+func (p *Patient) SetCurrentLocation(loc string) {
+	if p == nil {
+		return
+	}
+	p.currentLocation = loc
+}
+
+// AssignedDoctor retorna el personal asignado a la atención del paciente.
+func (p *Patient) AssignedDoctor() Attender {
+	if p == nil {
+		return nil
+	}
+	return p.assignedDoctor
+}
+
+// SetAssignedDoctor asigna un médico o asistente al paciente.
+func (p *Patient) SetAssignedDoctor(d Attender) {
+	if p == nil {
+		return
+	}
+	p.assignedDoctor = d
+}
+
+// Episodes retorna una copia de la lista de episodios registrados para el paciente.
 func (p *Patient) Episodes() []EpisodeRecord {
 	if p == nil {
 		return nil
@@ -86,33 +122,11 @@ func (p *Patient) Episodes() []EpisodeRecord {
 	return records
 }
 
-// AddEpisode agrega un nuevo registro de atención al historial del paciente.
+// AddEpisode registra un nuevo episodio atendido en el historial del paciente.
 func (p *Patient) AddEpisode(record EpisodeRecord) error {
 	if p == nil {
 		return ErrNilPatient
 	}
 	p.episodes = append(p.episodes, record)
-	return nil
-}
-
-// FallAsleep cambia el estado del paciente a dormido según el lugar donde se encuentre.
-func (p *Patient) FallAsleep(location string) error {
-	if p == nil {
-		return ErrNilPatient
-	}
-	if p.roomID != "" && location == p.roomID {
-		p.state = AsleepInBed
-	} else {
-		p.state = AsleepInHallway
-	}
-	return nil
-}
-
-// WakeUp despierta al paciente restableciendo su estado a Awake.
-func (p *Patient) WakeUp() error {
-	if p == nil {
-		return ErrNilPatient
-	}
-	p.state = Awake
 	return nil
 }
