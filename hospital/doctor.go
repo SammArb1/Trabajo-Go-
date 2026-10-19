@@ -1,18 +1,17 @@
 package hospital
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // Doctor representa a un médico especialista del hospital.
-// Embebe a Person e implementa la interfaz Attender.
+// Embebe a Person (composición) e implementa la interfaz Attender.
 type Doctor struct {
 	Person
 	specialty string
+	patients  []*Patient      // pacientes a su cargo
+	episodes  []EpisodeRecord // episodios en los que intervino
 }
 
-// Verificación en tiempo de compilación de que *Doctor satisface la interfaz Attender.
+// Verificación en tiempo de compilación de que *Doctor satisface Attender.
 var _ Attender = (*Doctor)(nil)
 
 // NewDoctor crea un nuevo médico validando los datos requeridos.
@@ -55,27 +54,67 @@ func (d *Doctor) SetSpecialty(specialty string) error {
 	return nil
 }
 
-// Attend atiende medicamente a un paciente en episodio de narcolepsia.
-// Cumple con la interfaz Attender.
+// DiagnosePatient toma al paciente a cargo del doctor: lo agrega a su lista
+// (sin duplicados) y lo registra como su médico asignado.
+func (d *Doctor) DiagnosePatient(p *Patient) error {
+	if d == nil {
+		return ErrAttenderNotFound
+	}
+	if p == nil {
+		return ErrNilPatient
+	}
+	for _, existing := range d.patients {
+		if existing.ID() == p.ID() {
+			p.SetAssignedDoctor(d)
+			return nil
+		}
+	}
+	d.patients = append(d.patients, p)
+	p.SetAssignedDoctor(d)
+	return nil
+}
+
+// PatientsUnderCare retorna una copia de los pacientes a cargo del doctor.
+func (d *Doctor) PatientsUnderCare() []*Patient {
+	if d == nil {
+		return nil
+	}
+	out := make([]*Patient, len(d.patients))
+	copy(out, d.patients)
+	return out
+}
+
+// Attend atiende a un paciente dormido, registra el episodio en el historial
+// del doctor y del paciente. Cumple la interfaz Attender.
 func (d *Doctor) Attend(p *Patient, location string) (EpisodeRecord, error) {
 	if d == nil {
 		return EpisodeRecord{}, ErrAttenderNotFound
 	}
-	if p == nil {
-		return EpisodeRecord{}, ErrNilPatient
-	}
-
-	notes := fmt.Sprintf("Atención médica por Dr. %s (%s). Paciente valorado y estabilizado.", d.Name(), d.specialty)
-	recordID := fmt.Sprintf("EP-DOC-%s-%d", d.ID(), time.Now().UnixNano())
-
-	record, err := NewEpisodeRecord(recordID, p.ID(), d.ID(), location, time.Now(), notes, true)
+	notes := fmt.Sprintf("Atención médica por Dr. %s (%s).", d.Name(), d.specialty)
+	rec, err := newAttendRecord(d, p, location, notes)
 	if err != nil {
 		return EpisodeRecord{}, err
 	}
+	d.episodes = append(d.episodes, rec)
+	return rec, nil
+}
 
-	if err := p.AddEpisode(record); err != nil {
-		return EpisodeRecord{}, err
+// AttendSleepEmergency atiende la emergencia en el lugar donde el paciente cayó dormido.
+func (d *Doctor) AttendSleepEmergency(p *Patient) error {
+	if p == nil {
+		return ErrNilPatient
 	}
+	_, err := d.Attend(p, p.Location())
+	return err
+}
 
-	return record, nil
+// MyEpisodes retorna una copia de todos los episodios en que intervino el doctor.
+// No recibe el hospital: la relación está modelada dentro de la entidad.
+func (d *Doctor) MyEpisodes() []EpisodeRecord {
+	if d == nil {
+		return nil
+	}
+	out := make([]EpisodeRecord, len(d.episodes))
+	copy(out, d.episodes)
+	return out
 }

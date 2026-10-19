@@ -12,6 +12,7 @@ type Patient struct {
 	state           PatientState
 	currentLocation string
 	assignedDoctor  Attender
+	room            *Room
 	episodes        []EpisodeRecord
 }
 
@@ -129,4 +130,20 @@ func (p *Patient) AddEpisode(record EpisodeRecord) error {
 	}
 	p.episodes = append(p.episodes, record)
 	return nil
+}
+
+// Room retorna la habitación donde está alojado el paciente (nil si no tiene).
+func (p *Patient) Room() *Room {
+	if p == nil {
+		return nil
+	}
+	return p.room
+}
+
+// SetRoom registra la habitación asignada al paciente (nil para limpiarla).
+func (p *Patient) SetRoom(r *Room) {
+	if p == nil {
+		return
+	}
+	p.room = r
 }

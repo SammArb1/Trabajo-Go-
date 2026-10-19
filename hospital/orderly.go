@@ -1,19 +1,16 @@
 package hospital
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
-// Orderly representa a un camillero responsable de socorrer y trasladar
-// a los pacientes narcolépticos que caen dormidos en los pasillos.
-// Embebe a Person e implementa la interfaz Attender.
+// Orderly representa a un camillero: socorre y traslada pacientes dormidos,
+// pero no diagnostica. Embebe a Person e implementa Attender.
 type Orderly struct {
 	Person
-	shift string
+	shift    string
+	episodes []EpisodeRecord
 }
 
-// Verificación en tiempo de compilación de que *Orderly satisface la interfaz Attender.
+// Verificación en tiempo de compilación de que *Orderly satisface Attender.
 var _ Attender = (*Orderly)(nil)
 
 // NewOrderly construye una nueva instancia de camillero validando sus datos.
@@ -56,27 +53,27 @@ func (o *Orderly) SetShift(shift string) error {
 	return nil
 }
 
-// Attend asiste y moviliza a un paciente hacia un lugar seguro.
-// Cumple con la interfaz Attender.
+// Attend asiste y moviliza a un paciente dormido sin diagnosticarlo.
+// Cumple la interfaz Attender.
 func (o *Orderly) Attend(p *Patient, location string) (EpisodeRecord, error) {
 	if o == nil {
 		return EpisodeRecord{}, ErrAttenderNotFound
 	}
-	if p == nil {
-		return EpisodeRecord{}, ErrNilPatient
-	}
-
-	notes := fmt.Sprintf("Asistencia y movilización por camillero %s (Turno: %s).", o.Name(), o.shift)
-	recordID := fmt.Sprintf("EP-ORD-%s-%d", o.ID(), time.Now().UnixNano())
-
-	record, err := NewEpisodeRecord(recordID, p.ID(), o.ID(), location, time.Now(), notes, true)
+	notes := fmt.Sprintf("Traslado por camillero %s (turno %s).", o.Name(), o.shift)
+	rec, err := newAttendRecord(o, p, location, notes)
 	if err != nil {
 		return EpisodeRecord{}, err
 	}
+	o.episodes = append(o.episodes, rec)
+	return rec, nil
+}
 
-	if err := p.AddEpisode(record); err != nil {
-		return EpisodeRecord{}, err
+// MyEpisodes retorna una copia de los traslados realizados por el camillero.
+func (o *Orderly) MyEpisodes() []EpisodeRecord {
+	if o == nil {
+		return nil
 	}
-
-	return record, nil
+	out := make([]EpisodeRecord, len(o.episodes))
+	copy(out, o.episodes)
+	return out
 }
