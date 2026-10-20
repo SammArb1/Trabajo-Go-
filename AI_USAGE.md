@@ -11,8 +11,8 @@ integrante.
 | Integrante | Rama | Responsabilidad |
 |---|---|---|
 | 1 — Samuel | `feature/patient-room` | Base del dominio: `types.go`, `person.go`, `patient.go`, `room.go` y las pruebas unitarias de habitaciones (`hospital_test.go`). |
-| 2 | `feature/staff-episodes` | Personal y episodios: `attender.go`, `doctor.go`, `orderly.go`, `episode.go`, `attenders_test.go` y este documento. |
-| 3 | `feature/hospital-orchestrator` | Orquestación: `hospital.go` (consultas y asignación de camas), `main.go` (escenario obligatorio) y `README.md`. |
+| 2 — Nicolas| `feature/staff-episodes` | Personal y episodios: `attender.go`, `doctor.go`, `orderly.go`, `episode.go`, `attenders_test.go` y este documento. |
+| 3 — Tomas | `feature/hospital-orchestrator` | Orquestación: `hospital.go` (consultas y asignación de camas), `main.go` (escenario obligatorio) y `README.md`. |
 
 ## 2. Herramientas usadas y para qué
 
