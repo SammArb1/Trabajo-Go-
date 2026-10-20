@@ -2,20 +2,32 @@ package hospital
 
 import (
 	"errors"
+	"fmt"
+	"sort"
+	"time"
 )
 
-// Hospital es el agregador principal del dominio.
-// Encapsula todas las colecciones y entidades del "Hospital de los Costeños con Narcolepsia".
+var (
+	ErrNoRoomAvailable    = errors.New("no room available: patient stays in the hallway")
+	ErrNoStaff            = errors.New("no hay personal contratado")
+	ErrPatientNotAsleep   = errors.New("el paciente no está dormido")
+	ErrPatientInBed       = errors.New("el paciente ya está en una cama")
+	ErrPatientNotAdmitted = errors.New("el paciente no está admitido en el hospital")
+)
+
+// Hospital guarda el personal en un []Attender (doctores y camilleros juntos),
+// y los pacientes, habitaciones y doctores en mapas por id.
 type Hospital struct {
-	name      string
-	rooms     map[string]*Room
-	patients  map[string]*Patient
-	doctors   map[string]*Doctor
-	orderlies map[string]*Orderly
-	episodes  []EpisodeRecord
+	name         string
+	rooms        map[string]*Room
+	patients     map[string]*Patient
+	doctors      map[string]*Doctor
+	orderlies    map[string]*Orderly
+	staff        []Attender
+	nextAttender int
+	episodes     []EpisodeRecord
 }
 
-// NewHospital inicializa una nueva instancia del hospital con mapas y listas vacíos.
 func NewHospital(name string) *Hospital {
 	if name == "" {
 		name = "Hospital de los Costeños con Narcolepsia"
@@ -26,35 +38,16 @@ func NewHospital(name string) *Hospital {
 		patients:  make(map[string]*Patient),
 		doctors:   make(map[string]*Doctor),
 		orderlies: make(map[string]*Orderly),
+		staff:     make([]Attender, 0),
 		episodes:  make([]EpisodeRecord, 0),
 	}
 }
 
-// Name retorna el nombre de la institución hospitalaria.
 func (h *Hospital) Name() string {
-	if h == nil {
-		return ""
-	}
 	return h.name
 }
 
-// SetName actualiza el nombre del hospital validando que no sea vacío.
-func (h *Hospital) SetName(name string) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
-	}
-	if name == "" {
-		return ErrEmptyName
-	}
-	h.name = name
-	return nil
-}
-
-// AddRoom registra una nueva habitación en el hospital.
 func (h *Hospital) AddRoom(room *Room) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
-	}
 	if room == nil {
 		return ErrNilRoom
 	}
@@ -65,162 +58,247 @@ func (h *Hospital) AddRoom(room *Room) error {
 	return nil
 }
 
-// Room busca una habitación por su identificador.
-func (h *Hospital) Room(id string) (*Room, error) {
-	if h == nil {
-		return nil, errors.New("hospital no puede ser nil")
+func (h *Hospital) AdmitPatient(p *Patient) error {
+	if p == nil {
+		return ErrNilPatient
 	}
-	r, exists := h.rooms[id]
-	if !exists {
-		return nil, ErrRoomNotFound
+	if _, exists := h.patients[p.ID()]; exists {
+		return errors.New("el paciente ya está admitido")
 	}
-	return r, nil
+	h.patients[p.ID()] = p
+	return nil
 }
 
-// Rooms retorna un slice con todas las habitaciones registradas.
-func (h *Hospital) Rooms() []*Room {
-	if h == nil {
-		return nil
+func (h *Hospital) HireDoctor(d *Doctor) error {
+	if d == nil {
+		return ErrAttenderNotFound
 	}
+	if h.isStaff(d.ID()) {
+		return fmt.Errorf("el personal %s ya está contratado", d.ID())
+	}
+	h.doctors[d.ID()] = d
+	h.staff = append(h.staff, d)
+	return nil
+}
+
+func (h *Hospital) HireOrderly(o *Orderly) error {
+	if o == nil {
+		return ErrAttenderNotFound
+	}
+	if h.isStaff(o.ID()) {
+		return fmt.Errorf("el personal %s ya está contratado", o.ID())
+	}
+	h.orderlies[o.ID()] = o
+	h.staff = append(h.staff, o)
+	return nil
+}
+
+func (h *Hospital) RegisterEpisode(record EpisodeRecord) error {
+	if record.ID() == "" {
+		return ErrEmptyID
+	}
+	h.episodes = append(h.episodes, record)
+	return nil
+}
+
+// Los listados se devuelven ordenados porque el orden de un mapa en Go es aleatorio.
+
+func (h *Hospital) Rooms() []*Room {
 	list := make([]*Room, 0, len(h.rooms))
 	for _, r := range h.rooms {
 		list = append(list, r)
 	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Number() < list[j].Number() })
 	return list
 }
 
-// RegisterPatient añade un nuevo paciente con narcolepsia al registro general.
-func (h *Hospital) RegisterPatient(patient *Patient) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
-	}
-	if patient == nil {
-		return ErrNilPatient
-	}
-	if _, exists := h.patients[patient.ID()]; exists {
-		return errors.New("el paciente ya se encuentra registrado")
-	}
-	h.patients[patient.ID()] = patient
-	return nil
-}
-
-// Patient busca un paciente por su identificador.
-func (h *Hospital) Patient(id string) (*Patient, error) {
-	if h == nil {
-		return nil, errors.New("hospital no puede ser nil")
-	}
-	p, exists := h.patients[id]
-	if !exists {
-		return nil, ErrPatientNotFound
-	}
-	return p, nil
-}
-
-// Patients retorna un slice con todos los pacientes registrados.
 func (h *Hospital) Patients() []*Patient {
-	if h == nil {
-		return nil
-	}
 	list := make([]*Patient, 0, len(h.patients))
 	for _, p := range h.patients {
 		list = append(list, p)
 	}
+	sort.Slice(list, func(i, j int) bool { return list[i].ID() < list[j].ID() })
 	return list
 }
 
-// RegisterDoctor registra un médico especialista en el hospital.
-func (h *Hospital) RegisterDoctor(doctor *Doctor) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
-	}
-	if doctor == nil {
-		return ErrAttenderNotFound
-	}
-	if _, exists := h.doctors[doctor.ID()]; exists {
-		return errors.New("el médico ya se encuentra registrado")
-	}
-	h.doctors[doctor.ID()] = doctor
-	return nil
-}
-
-// Doctor busca un médico por su identificador.
-func (h *Hospital) Doctor(id string) (*Doctor, error) {
-	if h == nil {
-		return nil, errors.New("hospital no puede ser nil")
-	}
-	d, exists := h.doctors[id]
-	if !exists {
-		return nil, ErrAttenderNotFound
-	}
-	return d, nil
-}
-
-// Doctors retorna la lista de médicos registrados.
 func (h *Hospital) Doctors() []*Doctor {
-	if h == nil {
-		return nil
-	}
 	list := make([]*Doctor, 0, len(h.doctors))
 	for _, d := range h.doctors {
 		list = append(list, d)
 	}
+	sort.Slice(list, func(i, j int) bool { return list[i].ID() < list[j].ID() })
 	return list
 }
 
-// RegisterOrderly registra un camillero en el hospital.
-func (h *Hospital) RegisterOrderly(orderly *Orderly) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
-	}
-	if orderly == nil {
-		return ErrAttenderNotFound
-	}
-	if _, exists := h.orderlies[orderly.ID()]; exists {
-		return errors.New("el camillero ya se encuentra registrado")
-	}
-	h.orderlies[orderly.ID()] = orderly
-	return nil
-}
-
-// Orderly busca un camillero por su identificador.
-func (h *Hospital) Orderly(id string) (*Orderly, error) {
-	if h == nil {
-		return nil, errors.New("hospital no puede ser nil")
-	}
-	o, exists := h.orderlies[id]
-	if !exists {
-		return nil, ErrAttenderNotFound
-	}
-	return o, nil
-}
-
-// Orderlies retorna la lista de camilleros registrados.
 func (h *Hospital) Orderlies() []*Orderly {
-	if h == nil {
-		return nil
-	}
 	list := make([]*Orderly, 0, len(h.orderlies))
 	for _, o := range h.orderlies {
 		list = append(list, o)
 	}
+	sort.Slice(list, func(i, j int) bool { return list[i].ID() < list[j].ID() })
 	return list
 }
 
-// Episodes retorna el historial de todos los episodios registrados en el hospital.
 func (h *Hospital) Episodes() []EpisodeRecord {
-	if h == nil {
-		return nil
-	}
 	list := make([]EpisodeRecord, len(h.episodes))
 	copy(list, h.episodes)
 	return list
 }
 
-// RecordEpisode almacena un nuevo registro de episodio en el hospital.
-func (h *Hospital) RecordEpisode(record EpisodeRecord) error {
-	if h == nil {
-		return errors.New("hospital no puede ser nil")
+// HandleSleepAttack duerme al paciente, intenta darle cama, despacha a un Attender
+// y registra el episodio. Si no hay cama devuelve el episodio junto con un error que
+// envuelve ErrNoRoomAvailable; el paciente queda en el pasillo.
+func (h *Hospital) HandleSleepAttack(p *Patient, location string) (EpisodeRecord, error) {
+	if p == nil {
+		return EpisodeRecord{}, ErrNilPatient
 	}
-	h.episodes = append(h.episodes, record)
+	if !h.isAdmitted(p) {
+		return EpisodeRecord{}, ErrPatientNotAdmitted
+	}
+	if p.State() != Awake {
+		return EpisodeRecord{}, ErrPatientInBed
+	}
+	attender, err := h.nextAttenderInTurn()
+	if err != nil {
+		return EpisodeRecord{}, err
+	}
+
+	p.SufferSleepAttack(location)
+	_, roomErr := h.AssignRoom(p)
+	if roomErr != nil && !errors.Is(roomErr, ErrNoRoomAvailable) {
+		return EpisodeRecord{}, roomErr
+	}
+
+	record, err := attender.Attend(p, location)
+	if err != nil {
+		return EpisodeRecord{}, err
+	}
+	if err := h.RegisterEpisode(record); err != nil {
+		return EpisodeRecord{}, err
+	}
+	return record, roomErr
+}
+
+// AssignRoom asigna la primera habitación libre (por número de habitación).
+// Sin cama devuelve error y el paciente sigue en AsleepInHallway.
+func (h *Hospital) AssignRoom(p *Patient) (*Room, error) {
+	if p == nil {
+		return nil, ErrNilPatient
+	}
+	if !h.isAdmitted(p) {
+		return nil, ErrPatientNotAdmitted
+	}
+	switch p.State() {
+	case Awake:
+		return nil, ErrPatientNotAsleep
+	case AsleepInBed:
+		return nil, ErrPatientInBed
+	}
+	for _, r := range h.Rooms() {
+		if r.IsAvailable() {
+			if err := r.Occupy(p); err != nil {
+				return nil, err
+			}
+			p.SetState(AsleepInBed)
+			return r, nil
+		}
+	}
+	return nil, fmt.Errorf("paciente %s: %w", p.ID(), ErrNoRoomAvailable)
+}
+
+// WakePatient despierta al paciente y libera la habitación donde estaba.
+func (h *Hospital) WakePatient(p *Patient) error {
+	if p == nil {
+		return ErrNilPatient
+	}
+	room := h.RoomOf(p)
+	if err := p.WakeUp(); err != nil {
+		return err
+	}
+	if room != nil {
+		return room.Release(p)
+	}
 	return nil
+}
+
+// RoomOf devuelve la habitación donde está el paciente, o nil si no tiene.
+func (h *Hospital) RoomOf(p *Patient) *Room {
+	for _, r := range h.Rooms() {
+		for _, o := range r.Occupants() {
+			if o == p {
+				return r
+			}
+		}
+	}
+	return nil
+}
+
+// PatientsInHallway (consulta 5.1): pacientes dormidos en un pasillo.
+func (h *Hospital) PatientsInHallway() []*Patient {
+	var out []*Patient
+	for _, p := range h.Patients() {
+		if p.State() == AsleepInHallway {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// EpisodesByAttender (consulta 5.2): episodios en los que intervino el personal con ese id.
+func (h *Hospital) EpisodesByAttender(id string) []EpisodeRecord {
+	var out []EpisodeRecord
+	for _, e := range h.episodes {
+		if e.AttenderID() == id {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// SevereReport (consulta 5.4): pacientes Severe y cuántos episodios tuvieron hoy.
+func (h *Hospital) SevereReport() map[*Patient]int {
+	report := make(map[*Patient]int)
+	severe := make(map[string]*Patient)
+	for _, p := range h.patients {
+		if p.Level() == Severe {
+			report[p] = 0
+			severe[p.ID()] = p
+		}
+	}
+	now := time.Now()
+	for _, e := range h.episodes {
+		if p, ok := severe[e.PatientID()]; ok && sameDay(e.Timestamp(), now) {
+			report[p]++
+		}
+	}
+	return report
+}
+
+func sameDay(a, b time.Time) bool {
+	y1, m1, d1 := a.Date()
+	y2, m2, d2 := b.Date()
+	return y1 == y2 && m1 == m2 && d1 == d2
+}
+
+func (h *Hospital) isAdmitted(p *Patient) bool {
+	return h.patients[p.ID()] == p
+}
+
+func (h *Hospital) isStaff(id string) bool {
+	for _, s := range h.staff {
+		if s.ID() == id {
+			return true
+		}
+	}
+	return false
+}
+
+// nextAttenderInTurn elige al siguiente del personal de forma rotativa.
+func (h *Hospital) nextAttenderInTurn() (Attender, error) {
+	if len(h.staff) == 0 {
+		return nil, ErrNoStaff
+	}
+	a := h.staff[h.nextAttender%len(h.staff)]
+	h.nextAttender++
+	return a, nil
 }
